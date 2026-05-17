@@ -9,7 +9,7 @@ const USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
 let lastTrades = [];
 let isTradingEnabled = true;
 
-const TOGGLE_PASSWORD = process.env.TOGGLE_PASSWORD || "defaultpassword"; // change in .env
+const TOGGLE_PASSWORD = process.env.TOGGLE_PASSWORD || "arc12345";
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -19,14 +19,16 @@ const ERC20_ABI = [
 ];
 
 // === CONFIG ===
-const RECIPIENT_BUY = '0xYOUR_BUY_WALLET_HERE';
-const RECIPIENT_SELL = '0xYOUR_SELL_WALLET_HERE';
+const RECIPIENT_BUY = '0x15757D6C310B721A0AdBcc9A79ea52e3A2988273';   // ← Update
+const RECIPIENT_SELL = '0xa7519988B2e550548A025A8021226aD4Abe337C6'; // ← Update
 const TRADE_AMOUNT = 0.05;
 const INTERVAL_MINUTES = 3;
 
 let tradeCount = 0;
 
 async function makeTradingDecision() {
+  console.log(`[${new Date().toLocaleTimeString()}] Agent cycle | Enabled: ${isTradingEnabled}`);
+
   if (!isTradingEnabled) return;
   if (tradeCount >= 30) return;
 
@@ -42,16 +44,24 @@ async function makeTradingDecision() {
     ]);
 
     const balanceFormatted = ethers.formatUnits(balance, decimals);
-    const amountInUnits = ethers.parseUnits(TRADE_AMOUNT.toString(), decimals);
+    console.log(`Balance: ${balanceFormatted} ${symbol}`);
 
-    if (balance < amountInUnits) return;
+    if (parseFloat(balanceFormatted) < TRADE_AMOUNT) {
+      console.log("❌ Insufficient balance");
+      return;
+    }
 
     const random = Math.random();
     let decision = "HOLD";
     let recipient = null;
 
-    if (random < 0.45) { decision = "BUY"; recipient = RECIPIENT_BUY; }
-    else if (random < 0.9) { decision = "SELL"; recipient = RECIPIENT_SELL; }
+    if (random < 0.45) {
+      decision = "BUY";
+      recipient = RECIPIENT_BUY;
+    } else if (random < 0.9) {
+      decision = "SELL";
+      recipient = RECIPIENT_SELL;
+    }
 
     const tradeLog = {
       time: new Date().toLocaleTimeString(),
@@ -67,7 +77,9 @@ async function makeTradingDecision() {
       return;
     }
 
-    const tx = await contract.transfer(recipient, amountInUnits);
+    console.log(`Executing ${decision}...`);
+    const tx = await contract.transfer(recipient, ethers.parseUnits(TRADE_AMOUNT.toString(), decimals));
+    
     tradeLog.txHash = tx.hash;
     tradeLog.status = "✅ Confirmed";
 
@@ -115,34 +127,26 @@ app.get('/', (req, res) => {
           `).join('')}
         </table>
 
-        <!-- Admin Toggle Section -->
         <div class="admin">
-          <h3>🔐 Admin Controls (Private)</h3>
+          <h3>🔐 Admin Controls</h3>
           <form action="/toggle" method="POST">
-            <input type="password" name="password" placeholder="Enter toggle password" required style="padding:8px; width:250px;">
+            <input type="password" name="password" placeholder="Enter password" required style="padding:8px; width:250px;">
             <button type="submit" style="padding:8px 16px;">Toggle Trading ON/OFF</button>
           </form>
         </div>
 
-        <p><small>Auto-refreshes every 10s • For hackathon demo only</small></p>
+        <p><small>Auto-refreshes every 10s</small></p>
       </body>
     </html>
   `);
 });
 
-// === PASSWORD-PROTECTED TOGGLE ===
 app.post('/toggle', express.urlencoded({ extended: true }), (req, res) => {
   if (req.body.password === TOGGLE_PASSWORD) {
     isTradingEnabled = !isTradingEnabled;
-    res.send(`
-      <h2>✅ Success! Trading is now ${isTradingEnabled ? 'ENABLED' : 'DISABLED'}</h2>
-      <p><a href="/">← Back to Dashboard</a></p>
-    `);
+    res.send(`<h2>Trading is now ${isTradingEnabled ? 'ENABLED ✅' : 'DISABLED ❌'}</h2><p><a href="/">← Back</a></p>`);
   } else {
-    res.send(`
-      <h2>❌ Wrong password</h2>
-      <p><a href="/">← Try again</a></p>
-    `);
+    res.send(`<h2>❌ Wrong password</h2><p><a href="/">← Try again</a></p>`);
   }
 });
 
