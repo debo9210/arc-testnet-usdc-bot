@@ -9,8 +9,7 @@ const USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
 let lastTrades = [];
 let isTradingEnabled = true;
 
-// === CHANGE THIS TO YOUR OWN SECRET (keep it private) ===
-const SECRET_KEY = process.env.SECRET_KEY_KEY;   // ← Change this!
+const TOGGLE_PASSWORD = process.env.TOGGLE_PASSWORD || "defaultpassword";
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -20,8 +19,8 @@ const ERC20_ABI = [
 ];
 
 // === CONFIG ===
-const RECIPIENT_BUY = '0x15757D6C310B721A0AdBcc9A79ea52e3A2988273';     // ← Update
-const RECIPIENT_SELL = '0xa7519988B2e550548A025A8021226aD4Abe337C6';   // ← Update
+const RECIPIENT_BUY = '0xYOUR_BUY_WALLET_HERE';
+const RECIPIENT_SELL = '0xYOUR_SELL_WALLET_HERE';
 const TRADE_AMOUNT = 0.05;
 const INTERVAL_MINUTES = 3;
 
@@ -51,13 +50,8 @@ async function makeTradingDecision() {
     let decision = "HOLD";
     let recipient = null;
 
-    if (random < 0.45) {
-      decision = "BUY";
-      recipient = RECIPIENT_BUY;
-    } else if (random < 0.9) {
-      decision = "SELL";
-      recipient = RECIPIENT_SELL;
-    }
+    if (random < 0.45) { decision = "BUY"; recipient = RECIPIENT_BUY; }
+    else if (random < 0.9) { decision = "SELL"; recipient = RECIPIENT_SELL; }
 
     const tradeLog = {
       time: new Date().toLocaleTimeString(),
@@ -73,27 +67,22 @@ async function makeTradingDecision() {
       return;
     }
 
-    console.log(`Executing ${decision}...`);
     const tx = await contract.transfer(recipient, amountInUnits);
-    
     tradeLog.txHash = tx.hash;
     tradeLog.status = "✅ Confirmed";
 
     lastTrades.unshift(tradeLog);
     if (lastTrades.length > 10) lastTrades.pop();
-
     tradeCount++;
 
-    tx.wait().then(() => {
-      console.log(`✅ Confirmed: ${tx.hash.substring(0, 12)}...`);
-    });
+    tx.wait().then(() => console.log(`✅ Confirmed: ${tx.hash.substring(0,12)}...`));
 
   } catch (error) {
     console.error('Error:', error.message);
   }
 }
 
-// === CLEAN PROFESSIONAL DASHBOARD ===
+// === DASHBOARD ===
 app.get('/', (req, res) => {
   res.send(`
     <html>
@@ -102,10 +91,10 @@ app.get('/', (req, res) => {
         <meta http-equiv="refresh" content="10">
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #e2e8f0; }
-          table { border-collapse: collapse; width: 100%; background: #1e2937; margin-top: 10px; }
-          th, td { padding: 12px; border: 1px solid #334155; text-align: left; }
+          table { border-collapse: collapse; width: 100%; background: #1e2937; }
+          th, td { padding: 12px; border: 1px solid #334155; }
           a { color: #60a5fa; }
-          h1 { color: #60a5fa; }
+          .admin { margin-top: 30px; padding: 15px; background: #1e2937; border-radius: 8px; }
         </style>
       </head>
       <body>
@@ -120,36 +109,45 @@ app.get('/', (req, res) => {
               <td>${t.time}</td>
               <td><strong>${t.decision}</strong></td>
               <td>${t.amount}</td>
-              <td>
-                ${t.txHash ? 
-                  `<a href="https://testnet.arcscan.app/tx/${t.txHash}" target="_blank">${t.txHash.substring(0, 12)}...</a>` : 
-                  '—'}
-              </td>
+              <td>${t.txHash ? `<a href="https://testnet.arcscan.app/tx/${t.txHash}" target="_blank">${t.txHash.substring(0,12)}...</a>` : '—'}</td>
               <td>${t.status}</td>
             </tr>
           `).join('')}
         </table>
-        
-        <p><small>Auto-refreshes every 10 seconds • Running on Arc Testnet</small></p>
+
+        <!-- Admin Toggle Section -->
+        <div class="admin">
+          <h3>🔐 Admin Controls (Private)</h3>
+          <form action="/toggle" method="POST">
+            <input type="password" name="password" placeholder="Enter toggle password" required style="padding:8px; width:250px;">
+            <button type="submit" style="padding:8px 16px;">Toggle Trading ON/OFF</button>
+          </form>
+        </div>
+
+        <p><small>Auto-refreshes every 10s • For hackathon demo only</small></p>
       </body>
     </html>
   `);
 });
 
-// === PRIVATE TOGGLE (only you know this) ===
-app.get(`/toggle-${SECRET_KEY}`, (req, res) => {
-  isTradingEnabled = !isTradingEnabled;
-  res.send(`
-    <h2>Trading is now ${isTradingEnabled ? 'ENABLED ✅' : 'DISABLED ❌'}</h2>
-    <p><a href="/">← Back to Dashboard</a></p>
-    <p><small>Secret toggle used successfully</small></p>
-  `);
+// === PASSWORD-PROTECTED TOGGLE ===
+app.post('/toggle', express.urlencoded({ extended: true }), (req, res) => {
+  if (req.body.password === TOGGLE_PASSWORD) {
+    isTradingEnabled = !isTradingEnabled;
+    res.send(`
+      <h2>✅ Success! Trading is now ${isTradingEnabled ? 'ENABLED' : 'DISABLED'}</h2>
+      <p><a href="/">← Back to Dashboard</a></p>
+    `);
+  } else {
+    res.send(`
+      <h2>❌ Wrong password</h2>
+      <p><a href="/">← Try again</a></p>
+    `);
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`🌐 Dashboard running at http://localhost:${PORT}`);
-  console.log(`🔐 Private toggle link: /toggle-${SECRET_KEY}`);
-  
+  console.log(`🌐 Dashboard live at https://arc-testnet-usdc-bot.onrender.com/`);
   makeTradingDecision();
   setInterval(makeTradingDecision, INTERVAL_MINUTES * 60 * 1000);
 });
