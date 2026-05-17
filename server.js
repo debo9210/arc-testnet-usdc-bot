@@ -7,7 +7,10 @@ const PORT = process.env.PORT || 3000;
 
 const USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
 let lastTrades = [];
-let isTradingEnabled = true;   // ← Toggle this
+let isTradingEnabled = true;
+
+// === CHANGE THIS TO YOUR OWN SECRET (keep it private) ===
+const SECRET_KEY = process.env.SECRET_KEY_KEY;   // ← Change this!
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -17,8 +20,8 @@ const ERC20_ABI = [
 ];
 
 // === CONFIG ===
-const RECIPIENT_BUY = '0x15757D6C310B721A0AdBcc9A79ea52e3A2988273';
-const RECIPIENT_SELL = '0xa7519988B2e550548A025A8021226aD4Abe337C6';
+const RECIPIENT_BUY = '0x15757D6C310B721A0AdBcc9A79ea52e3A2988273';     // ← Update
+const RECIPIENT_SELL = '0xa7519988B2e550548A025A8021226aD4Abe337C6';   // ← Update
 const TRADE_AMOUNT = 0.05;
 const INTERVAL_MINUTES = 3;
 
@@ -26,11 +29,7 @@ let tradeCount = 0;
 
 async function makeTradingDecision() {
   if (!isTradingEnabled) return;
-
-  if (tradeCount >= 30) {
-    console.log("🛑 Max trades reached.");
-    return;
-  }
+  if (tradeCount >= 30) return;
 
   try {
     const provider = new ethers.JsonRpcProvider(process.env.ARC_TESTNET_RPC_URL);
@@ -46,17 +45,19 @@ async function makeTradingDecision() {
     const balanceFormatted = ethers.formatUnits(balance, decimals);
     const amountInUnits = ethers.parseUnits(TRADE_AMOUNT.toString(), decimals);
 
-    if (balance < amountInUnits) {
-      console.log("⚠️ Low balance");
-      return;
-    }
+    if (balance < amountInUnits) return;
 
     const random = Math.random();
     let decision = "HOLD";
     let recipient = null;
 
-    if (random < 0.45) { decision = "BUY"; recipient = RECIPIENT_BUY; }
-    else if (random < 0.9) { decision = "SELL"; recipient = RECIPIENT_SELL; }
+    if (random < 0.45) {
+      decision = "BUY";
+      recipient = RECIPIENT_BUY;
+    } else if (random < 0.9) {
+      decision = "SELL";
+      recipient = RECIPIENT_SELL;
+    }
 
     const tradeLog = {
       time: new Date().toLocaleTimeString(),
@@ -83,14 +84,16 @@ async function makeTradingDecision() {
 
     tradeCount++;
 
-    tx.wait().then(() => console.log(`✅ Confirmed: ${tx.hash.substring(0,12)}...`));
+    tx.wait().then(() => {
+      console.log(`✅ Confirmed: ${tx.hash.substring(0, 12)}...`);
+    });
 
   } catch (error) {
     console.error('Error:', error.message);
   }
 }
 
-// === DASHBOARD ===
+// === CLEAN PROFESSIONAL DASHBOARD ===
 app.get('/', (req, res) => {
   res.send(`
     <html>
@@ -98,16 +101,16 @@ app.get('/', (req, res) => {
         <title>Arc Trading Agent</title>
         <meta http-equiv="refresh" content="10">
         <style>
-          body { font-family: Arial; padding: 20px; background: #0f172a; color: #e2e8f0; }
-          table { border-collapse: collapse; width: 100%; background: #1e2937; }
-          th, td { padding: 10px; border: 1px solid #334155; text-align: left; }
+          body { font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #e2e8f0; }
+          table { border-collapse: collapse; width: 100%; background: #1e2937; margin-top: 10px; }
+          th, td { padding: 12px; border: 1px solid #334155; text-align: left; }
           a { color: #60a5fa; }
+          h1 { color: #60a5fa; }
         </style>
       </head>
       <body>
-        <h1>🚀 Arc Trading Agent — Live on Testnet</h1>
+        <h1>🚀 Arc Trading Agent</h1>
         <p><strong>Status:</strong> ${isTradingEnabled ? '🟢 Trading ENABLED' : '🔴 Trading DISABLED'}</p>
-        <p><a href="/toggle" style="color:#60a5fa;">🔄 Click here to Toggle Trading ON/OFF</a></p>
         
         <h2>Recent Real Trades</h2>
         <table>
@@ -127,23 +130,25 @@ app.get('/', (req, res) => {
           `).join('')}
         </table>
         
-        <p><small>Page auto-refreshes every 10s • Max 30 trades</small></p>
+        <p><small>Auto-refreshes every 10 seconds • Running on Arc Testnet</small></p>
       </body>
     </html>
   `);
 });
 
-app.get('/toggle', (req, res) => {
+// === PRIVATE TOGGLE (only you know this) ===
+app.get(`/toggle-${SECRET_KEY}`, (req, res) => {
   isTradingEnabled = !isTradingEnabled;
   res.send(`
     <h2>Trading is now ${isTradingEnabled ? 'ENABLED ✅' : 'DISABLED ❌'}</h2>
     <p><a href="/">← Back to Dashboard</a></p>
+    <p><small>Secret toggle used successfully</small></p>
   `);
 });
 
 app.listen(PORT, () => {
   console.log(`🌐 Dashboard running at http://localhost:${PORT}`);
-  console.log(`Live: https://arc-testnet-usdc-bot.onrender.com/`);
+  console.log(`🔐 Private toggle link: /toggle-${SECRET_KEY}`);
   
   makeTradingDecision();
   setInterval(makeTradingDecision, INTERVAL_MINUTES * 60 * 1000);
