@@ -9,7 +9,7 @@ const USDC_ADDRESS = '0x3600000000000000000000000000000000000000';
 let lastTrades = [];
 let isTradingEnabled = true;
 
-const TOGGLE_PASSWORD = process.env.TOGGLE_PASSWORD || "defaultpassword";
+const TOGGLE_PASSWORD = process.env.TOGGLE_PASSWORD || "defaultpassword"; // change in .env
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
